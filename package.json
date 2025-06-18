@@ -1,5 +1,8 @@
 {
   "name": "singbox-conf",
   "version": "1.0.0",
-  "description": ""
+  "description": "",
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  }
 }
