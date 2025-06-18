@@ -52,14 +52,13 @@ export const handler = async (event) => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
+          success: false,
           error: '请求体必须包含url字段',
           example: { url: 'https://example.com/api/data' }
         })
       };
     }
 
-    // 从URL获取并解析base64内容
-    console.log('正在请求URL:', body.url);
     const decodedContent = await fetchAndDecodeBase64(body.url, body.options || {});
 
     // 返回解析后的内容
@@ -70,7 +69,9 @@ export const handler = async (event) => {
       },
       body: JSON.stringify({
         success: true,
+        name: body.name,
         url: body.url,
+        error: '',
         content: decodedContent
       })
     };
@@ -82,6 +83,7 @@ export const handler = async (event) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
+        success: false,
         error: '处理请求时发生错误',
         message: error.message
       })
