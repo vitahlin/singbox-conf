@@ -1,0 +1,87 @@
+name: Deploy to AWS Lambda
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main]
+
+env:
+  LAMBDA_FUNCTION_NAME: singbox-conf-handler  
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: |
+        if [ -f package.json ]; then
+          npm ci
+        else
+          echo "No package.json found, skipping npm install"
+        fi
+        
+    - name: Create deployment package
+      run: |
+        # 创建临时目录
+        mkdir -p lambda-package
+        
+        # 复制源代码文件
+        cp index.mjs lambda-package/
+        
+        # 如果有package.json和node_modules，也复制进去
+        if [ -f package.json ]; then
+          cp package.json lambda-package/
+          if [ -d node_modules ]; then
+            cp -r node_modules lambda-package/
+          fi
+        fi
+        
+        # 创建zip文件
+        cd lambda-package
+        zip -r ../lambda-deployment.zip .
+        cd ..
+        
+        # 显示zip文件信息
+        ls -la lambda-deployment.zip
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+        
+    - name: Deploy to Lambda
+      run: |
+        # 更新Lambda函数代码
+        aws lambda update-function-code \
+          --function-name ${{ env.LAMBDA_FUNCTION_NAME }} \
+          --zip-file fileb://lambda-deployment.zip
+          
+        # 等待更新完成
+        aws lambda wait function-updated \
+          --function-name ${{ env.LAMBDA_FUNCTION_NAME }}
+          
+        # 获取函数信息
+        aws lambda get-function \
+          --function-name ${{ env.LAMBDA_FUNCTION_NAME }} \
+          --query 'Configuration.[FunctionName,LastModified,CodeSize]' \
+          --output table
+          
+    - name: Upload deployment artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: lambda-deployment-package
+        path: lambda-deployment.zip
+        retention-days: 30
